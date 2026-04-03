@@ -70,7 +70,7 @@ model User {
   accounts      Account[]
   sessions      Session[]
   subscription  Subscription?
-  locations     Location[]
+  businesses     Business[]
   alerts        Alert[]
   integrations  Integration[]
 
@@ -137,7 +137,7 @@ model Subscription {
   @@index([stripeSubscriptionId])
 }
 
-model Location {
+model Business {
   id          String   @id @default(cuid())
   userId      String
   name        String
@@ -169,7 +169,7 @@ model Location {
 
 model Review {
   id             String       @id @default(cuid())
-  locationId     String
+  businessId     String
   source         ReviewSource
   externalId     String?
   authorName     String?
@@ -186,11 +186,11 @@ model Review {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  location       Location        @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  business       Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
   sentimentScore SentimentScore?
 
-  @@unique([locationId, source, externalId])
-  @@index([locationId])
+  @@unique([businessId, source, externalId])
+  @@index([businessId])
   @@index([publishedAt])
   @@index([rating])
   @@index([source])
@@ -199,7 +199,7 @@ model Review {
 model SentimentScore {
   id               String   @id @default(cuid())
   reviewId         String?  @unique
-  locationId       String
+  businessId       String
   score            Float
   magnitude        Float    @default(0)
   label            String
@@ -213,9 +213,9 @@ model SentimentScore {
   updatedAt        DateTime @updatedAt
 
   review   Review?  @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  @@index([locationId])
+  @@index([businessId])
   @@index([score])
   @@index([analyzedAt])
 }
@@ -223,7 +223,7 @@ model SentimentScore {
 model Alert {
   id          String       @id @default(cuid())
   userId      String
-  locationId  String?
+  businessId  String?
   type        AlertType
   channel     AlertChannel @default(EMAIL)
   name        String
@@ -239,17 +239,17 @@ model Alert {
   updatedAt   DateTime     @updatedAt
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  location Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  business Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
 
   @@index([userId])
-  @@index([locationId])
+  @@index([businessId])
   @@index([isActive])
 }
 
 model Integration {
   id           String          @id @default(cuid())
   userId       String
-  locationId   String?
+  businessId   String?
   type         IntegrationType
   name         String
   accessToken  String?         @db.Text
@@ -264,10 +264,10 @@ model Integration {
   updatedAt    DateTime        @updatedAt
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  location Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  business Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
 
-  @@unique([userId, locationId, type])
+  @@unique([userId, businessId, type])
   @@index([userId])
-  @@index([locationId])
+  @@index([businessId])
   @@index([isActive])
 }
