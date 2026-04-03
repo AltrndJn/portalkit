@@ -8,4 +8,4 @@ dist/
 build/
 coverage/
 __pycache__/
-.npm/
+.npm/.env.local
