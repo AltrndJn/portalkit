@@ -1,0 +1,273 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SubscriptionPlan {
+  FREE
+  STARTER
+  PRO
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAST_DUE
+  TRIALING
+  INCOMPLETE
+}
+
+enum ReviewSource {
+  GOOGLE
+  YELP
+  TRIPADVISOR
+  FACEBOOK
+  TRUSTPILOT
+  CUSTOM
+}
+
+enum AlertType {
+  NEGATIVE_REVIEW
+  POSITIVE_REVIEW
+  RATING_DROP
+  NEW_REVIEW
+  SENTIMENT_CHANGE
+  WEEKLY_DIGEST
+}
+
+enum AlertChannel {
+  EMAIL
+  SMS
+  WEBHOOK
+  SLACK
+}
+
+enum IntegrationType {
+  GOOGLE_MY_BUSINESS
+  YELP
+  TRIPADVISOR
+  FACEBOOK
+  TRUSTPILOT
+  SLACK
+  WEBHOOK
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  subscription  Subscription?
+  locations     Location[]
+  alerts        Alert[]
+  integrations  Integration[]
+
+  @@index([email])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  userId               String             @unique
+  stripeCustomerId     String?            @unique
+  stripeSubscriptionId String?            @unique
+  stripePriceId        String?
+  plan                 SubscriptionPlan   @default(FREE)
+  status               SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  trialEnd             DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
+}
+
+model Location {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  address     String?
+  city        String?
+  state       String?
+  country     String   @default("US")
+  postalCode  String?
+  phone       String?
+  website     String?
+  placeId     String?
+  latitude    Float?
+  longitude   Float?
+  avgRating   Float    @default(0)
+  totalReviews Int     @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviews        Review[]
+  alerts         Alert[]
+  integrations   Integration[]
+  sentimentScores SentimentScore[]
+
+  @@index([userId])
+  @@index([placeId])
+}
+
+model Review {
+  id             String       @id @default(cuid())
+  locationId     String
+  source         ReviewSource
+  externalId     String?
+  authorName     String?
+  authorImage    String?
+  rating         Float
+  title          String?
+  body           String?      @db.Text
+  language       String       @default("en")
+  isVerified     Boolean      @default(false)
+  isReplied      Boolean      @default(false)
+  replyText      String?      @db.Text
+  replyDate      DateTime?
+  publishedAt    DateTime
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  location       Location        @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  sentimentScore SentimentScore?
+
+  @@unique([locationId, source, externalId])
+  @@index([locationId])
+  @@index([publishedAt])
+  @@index([rating])
+  @@index([source])
+}
+
+model SentimentScore {
+  id               String   @id @default(cuid())
+  reviewId         String?  @unique
+  locationId       String
+  score            Float
+  magnitude        Float    @default(0)
+  label            String
+  positiveAspects  String[] @default([])
+  negativeAspects  String[] @default([])
+  keywords         String[] @default([])
+  summary          String?  @db.Text
+  modelVersion     String   @default("gpt-4")
+  analyzedAt       DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  review   Review?  @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@index([locationId])
+  @@index([score])
+  @@index([analyzedAt])
+}
+
+model Alert {
+  id          String       @id @default(cuid())
+  userId      String
+  locationId  String?
+  type        AlertType
+  channel     AlertChannel @default(EMAIL)
+  name        String
+  isActive    Boolean      @default(true)
+  threshold   Float?
+  webhookUrl  String?
+  slackChannel String?
+  phoneNumber String?
+  emailTo     String?
+  conditions  Json         @default("{}")
+  lastFiredAt DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  location Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([locationId])
+  @@index([isActive])
+}
+
+model Integration {
+  id           String          @id @default(cuid())
+  userId       String
+  locationId   String?
+  type         IntegrationType
+  name         String
+  accessToken  String?         @db.Text
+  refreshToken String?         @db.Text
+  tokenExpiry  DateTime?
+  accountId    String?
+  config       Json            @default("{}")
+  isActive     Boolean         @default(true)
+  lastSyncAt   DateTime?
+  syncFrequency Int            @default(60)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  location Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, locationId, type])
+  @@index([userId])
+  @@index([locationId])
+  @@index([isActive])
+}
