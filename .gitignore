@@ -2,10 +2,12 @@ node_modules/
 .next/
 .vercel/
 .env
+.env.local
+.env.production
 *.log
 .DS_Store
 dist/
 build/
 coverage/
 __pycache__/
-.npm/.env.local
+.npm/
